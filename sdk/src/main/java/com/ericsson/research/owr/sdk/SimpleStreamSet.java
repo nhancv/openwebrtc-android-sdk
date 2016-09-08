@@ -37,8 +37,10 @@ import java.util.List;
 public class SimpleStreamSet extends StreamSet {
     private static final String TAG = "SimpleStreamSet";
 
-    private final boolean mWantVideo;
-    private final boolean mWantAudio;
+    private final boolean mSendVideo;
+    private final boolean mSendAudio;
+    private final boolean mRevcVideo;
+    private final boolean mRevcAudio;
 
     private final AudioRenderer mAudioRenderer;
 
@@ -49,8 +51,15 @@ public class SimpleStreamSet extends StreamSet {
 
     private SimpleStreamSet(MediaSourceProvider audioSourceProvider, MediaSourceProvider videoSourceProvider,
                             boolean sendAudio, boolean sendVideo) {
-        mWantAudio = sendAudio;
-        mWantVideo = sendVideo;
+        this(audioSourceProvider, videoSourceProvider, sendAudio, sendVideo, true, true);
+    }
+
+    private SimpleStreamSet(MediaSourceProvider audioSourceProvider, MediaSourceProvider videoSourceProvider,
+                            boolean sendAudio, boolean sendVideo, boolean revcAudio, boolean revcVideo) {
+        mSendAudio = sendAudio;
+        mSendVideo = sendVideo;
+        mRevcAudio = revcAudio;
+        mRevcVideo = revcVideo;
 
         mAudioRenderer = new AudioRenderer();
 
@@ -72,23 +81,6 @@ public class SimpleStreamSet extends StreamSet {
         });
     }
 
-    private class VideoSourceProvider implements MediaSourceProvider {
-        private MediaSourceListenerSet set = new MediaSourceListenerSet();
-
-        public void notifyListeners(MediaSource mediaSource) {
-            set.notifyListeners(mediaSource);
-        }
-
-        @Override
-        public void addMediaSourceListener(final MediaSourceListener listener) {
-            set.addListener(listener);
-        }
-    }
-
-    public VideoView createRemoteView() {
-        return new VideoViewImpl(mRemoteVideoSourceProvider, 0, 0, 0);
-    }
-
     /**
      * Creates a configuration for setting up a basic audio/video call.
      *
@@ -98,6 +90,23 @@ public class SimpleStreamSet extends StreamSet {
      */
     public static SimpleStreamSet defaultConfig(boolean sendAudio, boolean sendVideo) {
         return new SimpleStreamSet(MicrophoneSource.getInstance(), CameraSource.getInstance(), sendAudio, sendVideo);
+    }
+
+    /**
+     * Creates a configuration for setting up a basic audio/video call.
+     *
+     * @param sendAudio true if audio should be sent
+     * @param sendVideo true if video should be sent
+     * @param revcAudio true if video should be received
+     * @param revcVideo true if video should be received
+     * @return a new RtcConfig with a simple audio/video call configuration
+     */
+    public static SimpleStreamSet defaultConfig(boolean sendAudio, boolean sendVideo, boolean revcAudio, boolean revcVideo) {
+        return new SimpleStreamSet(MicrophoneSource.getInstance(), CameraSource.getInstance(), sendAudio, sendVideo, revcAudio, revcVideo);
+    }
+
+    public VideoView createRemoteView() {
+        return new VideoViewImpl(mRemoteVideoSourceProvider, 0, 0, 0);
     }
 
     @Override
@@ -110,6 +119,19 @@ public class SimpleStreamSet extends StreamSet {
      */
     public String dumpPipelineGraph() {
         return mAudioRenderer.getDotData();
+    }
+
+    private class VideoSourceProvider implements MediaSourceProvider {
+        private MediaSourceListenerSet set = new MediaSourceListenerSet();
+
+        public void notifyListeners(MediaSource mediaSource) {
+            set.notifyListeners(mediaSource);
+        }
+
+        @Override
+        public void addMediaSourceListener(final MediaSourceListener listener) {
+            set.addListener(listener);
+        }
     }
 
     private class SimpleMediaStream extends MediaStream {
@@ -135,12 +157,12 @@ public class SimpleStreamSet extends StreamSet {
 
         @Override
         protected boolean wantSend() {
-            return mIsVideo ? mWantVideo : mWantAudio;
+            return mIsVideo ? mSendVideo : mSendAudio;
         }
 
         @Override
         protected boolean wantReceive() {
-            return true;
+            return mIsVideo ? mRevcVideo : mRevcAudio;
         }
 
         @Override
